@@ -3,8 +3,9 @@ import click
 import sys
 import subprocess
 import signal
+import os
 
-from Instance import ManualInstances, AWSInstances
+from Instance import ManualInstances, AWSEC2Instances, AWSMSKInstances
 
 @click.group(help='Access kafka/zookeeper via ssh tunnel to consume and produce messages from your local machine')
 def cli():
@@ -14,32 +15,44 @@ def cli():
 @click.argument('jump_host')
 @click.option('-zp','--zookeeper_port',default='2181')
 @click.option('-kp','--kafka_port',default='9092')
-@click.option('-r','--region',default='ap-southeast-2')
+@click.option('-r','--region',default='us-east-1')
 @click.option('-p','--profile',default='default')
 @click.option('-jc','--jump_host_cert',default=None)
 def aws(jump_host,zookeeper_port,kafka_port,region,profile,jump_host_cert):
     instances=[]
     click.echo(' * retrieving ip\'s from AWS ({},{}) zookeeper/kafka ec2 instances by tag_name ...'.format(profile,region))
-    aws = AWSInstances(profile,region)
+    aws = AWSEC2Instances(profile,region)
     instances += aws.getIps('zookeeper',zookeeper_port)
     instances += aws.getIps('kafka',kafka_port)
+    print(instances)
     connect(jump_host,instances,jump_host_cert)
 
 @cli.command(help='clean up interfaces after ungraceful exit from AWS)')
 @click.argument('jump_host')
 @click.option('-zp','--zookeeper_port',default='2181')
 @click.option('-kp','--kafka_port',default='9092')
-@click.option('-r','--region',default='ap-southeast-2')
+@click.option('-r','--region',default='us-east-1')
 @click.option('-p','--profile',default='default')
 @click.option('-jc','--jump_host_cert',default=None)
 def awsclean(jump_host,zookeeper_port,kafka_port,region,profile,jump_host_cert):
     instances=[]
     click.echo(' * retrieving ip\'s from AWS ({},{}) zookeeper/kafka ec2 instances by tag_name ...'.format(profile,region))
-    aws = AWSInstances(profile,region)
+    aws = AWSEC2Instances(profile,region)
     instances += aws.getIps('zookeeper',zookeeper_port)
     instances += aws.getIps('kafka',kafka_port)
     click.echo(' * cleaning up interfaces ...')
     connect(jump_host,instances,jump_host_cert)
+
+@cli.command(help='provide the IP\'s of your zookeeper/kafka')
+@click.argument('jump_host')
+@click.argument('cluster_arn')
+@click.option('-r','--region',default='us-east-1')
+@click.option('-p','--profile',default='default')
+@click.option('-jc','--jump_host_cert',default=None)
+def msk(jump_host, cluster_arn, region, profile, jump_host_cert):
+    msk = AWSMSKInstances(profile, region)
+    connect(jump_host, msk.get_instances(cluster_arn), jump_host_cert)
+
 
 @cli.command(help='provide the IP\'s of your zookeeper/kafka')
 @click.argument('jump_host')
